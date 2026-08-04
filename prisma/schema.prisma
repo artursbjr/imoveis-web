@@ -1,0 +1,260 @@
+// ============================================
+// Schema Prisma — Sistema de Gestão de Imóveis
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- ENUMS ----------
+
+enum TipoImovel {
+  CASA
+  APARTAMENTO
+  COMERCIAL
+  TERRENO
+  OUTRO
+}
+
+enum StatusImovel {
+  VAGO
+  ALUGADO
+  PROPRIO_USO
+  MANUTENCAO
+}
+
+enum StatusContrato {
+  ATIVO
+  ENCERRADO
+  RENOVADO
+  CANCELADO
+}
+
+enum IndiceReajuste {
+  IGPM
+  IPCA
+  INCC
+  OUTRO
+}
+
+enum StatusCobranca {
+  PENDENTE
+  PAGO
+  ATRASADO
+  CANCELADO
+}
+
+enum TipoContaConsumo {
+  LUZ
+  AGUA
+  GAS
+  CONDOMINIO
+  INTERNET
+  SEGURO
+  IPTU
+  OUTRO
+}
+
+enum TipoDocumento {
+  CONTRATO
+  IPTU
+  MATRICULA
+  VISTORIA
+  SEGURO
+  COMPROVANTE
+  OUTRO
+}
+
+enum TipoAlerta {
+  A_PAGAR
+  A_RECEBER
+}
+
+enum StatusAlerta {
+  PENDENTE
+  LIDO
+  RESOLVIDO
+}
+
+// ---------- MODELOS ----------
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  createdAt DateTime @default(now())
+
+  imoveis Imovel[]
+}
+
+model Imovel {
+  id               String       @id @default(uuid())
+  usuarioId        String
+  usuario          Usuario      @relation(fields: [usuarioId], references: [id])
+
+  apelido          String       // ex: "Apto Centro 302"
+  tipo             TipoImovel
+  status           StatusImovel @default(VAGO)
+
+  endereco         String
+  numero           String?
+  complemento      String?
+  bairro           String?
+  cidade           String
+  estado           String
+  cep              String?
+
+  matricula        String?      // matrícula no cartório
+  inscricaoIptu    String?
+  areaM2           Float?
+  valorReferencia  Float?       // valor de mercado/aluguel de referência
+
+  observacoes      String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  contratos        Contrato[]
+  contasConsumo    ContaConsumo[]
+  documentos       Documento[]
+
+  @@index([usuarioId])
+}
+
+model Inquilino {
+  id          String   @id @default(uuid())
+  nome        String
+  cpfCnpj     String   @unique
+  email       String?
+  telefone    String?
+  endereco    String?
+  observacoes String?
+  createdAt   DateTime @default(now())
+
+  contratos   Contrato[]
+}
+
+model Contrato {
+  id               String          @id @default(uuid())
+  imovelId         String
+  imovel           Imovel          @relation(fields: [imovelId], references: [id], onDelete: Cascade)
+  inquilinoId      String
+  inquilino        Inquilino       @relation(fields: [inquilinoId], references: [id])
+
+  dataInicio       DateTime
+  dataFim          DateTime?
+  diaVencimento    Int             // dia do mês, ex: 5
+  valorAluguel     Float
+  valorCondominio  Float?
+  incluiCondominio Boolean         @default(false)
+
+  indiceReajuste   IndiceReajuste?
+  dataProxReajuste DateTime?
+
+  status           StatusContrato  @default(ATIVO)
+  observacoes      String?
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  cobrancas        Cobranca[]
+  documentos       Documento[]
+
+  @@index([imovelId])
+  @@index([inquilinoId])
+}
+
+// Cobrança de aluguel (gerada mensalmente por contrato)
+model Cobranca {
+  id              String         @id @default(uuid())
+  contratoId      String
+  contrato        Contrato       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  referenciaMes   DateTime       // primeiro dia do mês de referência
+  dataVencimento  DateTime
+
+  valorAluguel    Float
+  valorCondominio Float?
+  valorContas     Float?         // soma das contas de consumo vinculadas
+  valorEncargos   Float?         // multa/juros de atraso, outros acréscimos
+  valorDesconto   Float?
+  valorTotal      Float
+
+  status          StatusCobranca @default(PENDENTE)
+  dataPagamento   DateTime?
+  formaPagamento  String?
+
+  observacoes     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  contasConsumo   ContaConsumo[]
+
+  @@unique([contratoId, referenciaMes])
+  @@index([status, dataVencimento])
+}
+
+model ContaConsumo {
+  id             String           @id @default(uuid())
+  imovelId       String
+  imovel         Imovel           @relation(fields: [imovelId], references: [id], onDelete: Cascade)
+
+  cobrancaId     String?
+  cobranca       Cobranca?        @relation(fields: [cobrancaId], references: [id], onDelete: SetNull)
+
+  tipo           TipoContaConsumo
+  referenciaMes  DateTime
+  valor          Float
+  dataVencimento DateTime
+  dataPagamento  DateTime?
+  status         StatusCobranca   @default(PENDENTE)
+
+  comprovanteUrl String?
+  observacoes    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([imovelId, tipo])
+  @@index([status, dataVencimento])
+  @@index([cobrancaId])
+}
+
+model Documento {
+  id          String        @id @default(uuid())
+  imovelId    String?
+  imovel      Imovel?       @relation(fields: [imovelId], references: [id], onDelete: Cascade)
+  contratoId  String?
+  contrato    Contrato?     @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  nome        String
+  tipo        TipoDocumento
+  arquivoUrl  String
+  tamanhoKb   Int?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([imovelId])
+  @@index([contratoId])
+}
+
+// Registro de alertas (gerado por job/cron a partir de Cobranca e ContaConsumo)
+model Alerta {
+  id             String       @id @default(uuid())
+  tipo           TipoAlerta   // A_PAGAR (contas) ou A_RECEBER (aluguel)
+  status         StatusAlerta @default(PENDENTE)
+
+  // referência polimórfica simples: preenche apenas um dos dois
+  cobrancaId     String?
+  contaConsumoId String?
+
+  titulo         String
+  dataVencimento DateTime
+  createdAt      DateTime     @default(now())
+
+  @@index([status, dataVencimento])
+}

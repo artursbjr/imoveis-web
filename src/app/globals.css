@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-paper-100 text-ink-900 font-body;
+}
+
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono uppercase tracking-wide;
+}
+.badge-vago { @apply bg-paper-200 text-ink-700; }
+.badge-alugado { @apply bg-olive-500/15 text-olive-700; }
+.badge-proprio { @apply bg-amber-500/15 text-amber-500; }
+.badge-manutencao { @apply bg-brick-500/15 text-brick-500; }
