@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import MarcarPagoButton from "@/components/MarcarPagoButton";
 import ExcluirButton from "@/components/ExcluirButton";
 
@@ -32,10 +34,14 @@ const statusClass: Record<string, string> = {
 };
 
 export default async function ContasConsumoPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let contas: ContaComImovel[] = [];
   let erroConexao = false;
   try {
     contas = await prisma.contaConsumo.findMany({
+      where: { usuarioId },
       include: { imovel: true },
       orderBy: { dataVencimento: "asc" },
     });

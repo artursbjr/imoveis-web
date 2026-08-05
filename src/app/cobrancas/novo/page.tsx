@@ -1,11 +1,16 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import CobrancaForm from "@/components/CobrancaForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovaCobrancaPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   const contratos = await prisma.contrato.findMany({
-    where: { status: "ATIVO" },
+    where: { usuarioId, status: "ATIVO" },
     include: { imovel: true, inquilino: true },
     orderBy: { createdAt: "desc" },
   });

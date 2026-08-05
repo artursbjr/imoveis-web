@@ -1,17 +1,22 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getAlertas } from "@/lib/alertas";
+import { requireUsuarioId } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export default async function PainelPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let total = 0;
   let alugados = 0;
   let totalAlertas = 0;
   try {
-    total = await prisma.imovel.count();
-    alugados = await prisma.imovel.count({ where: { status: "ALUGADO" } });
-    const { aPagar, aReceber } = await getAlertas();
+    total = await prisma.imovel.count({ where: { usuarioId } });
+    alugados = await prisma.imovel.count({ where: { usuarioId, status: "ALUGADO" } });
+    const { aPagar, aReceber } = await getAlertas(usuarioId);
     totalAlertas = aPagar.length + aReceber.length;
   } catch {
     // banco ainda não conectado — ok em preview

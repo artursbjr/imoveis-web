@@ -1,11 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { requireUsuarioId } from "@/lib/tenant";
 import InquilinoForm from "@/components/InquilinoForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditarInquilinoPage({ params }: { params: { id: string } }) {
-  const inquilino = await prisma.inquilino.findUnique({ where: { id: params.id } });
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
+  const inquilino = await prisma.inquilino.findFirst({ where: { id: params.id, usuarioId } });
   if (!inquilino) notFound();
 
   return (

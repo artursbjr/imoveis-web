@@ -1,10 +1,15 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import ContaConsumoForm from "@/components/ContaConsumoForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovaContaConsumoPage() {
-  const imoveis = await prisma.imovel.findMany({ orderBy: { apelido: "asc" } });
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
+  const imoveis = await prisma.imovel.findMany({ where: { usuarioId }, orderBy: { apelido: "asc" } });
 
   return (
     <div className="max-w-xl">

@@ -1,12 +1,17 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import DocumentoForm from "@/components/DocumentoForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovoDocumentoPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   const [imoveis, contratos] = await Promise.all([
-    prisma.imovel.findMany({ orderBy: { apelido: "asc" } }),
-    prisma.contrato.findMany({ include: { inquilino: true }, orderBy: { createdAt: "desc" } }),
+    prisma.imovel.findMany({ where: { usuarioId }, orderBy: { apelido: "asc" } }),
+    prisma.contrato.findMany({ where: { usuarioId }, include: { inquilino: true }, orderBy: { createdAt: "desc" } }),
   ]);
 
   return (

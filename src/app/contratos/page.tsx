@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import ExcluirButton from "@/components/ExcluirButton";
 
 const statusClass: Record<string, string> = {
@@ -17,10 +19,14 @@ type ContratoComRelacoes = Prisma.ContratoGetPayload<{
 export const dynamic = "force-dynamic";
 
 export default async function ContratosPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let contratos: ContratoComRelacoes[] = [];
   let erroConexao = false;
   try {
     contratos = await prisma.contrato.findMany({
+      where: { usuarioId },
       include: { imovel: true, inquilino: true },
       orderBy: { createdAt: "desc" },
     });

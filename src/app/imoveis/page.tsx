@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import ExcluirButton from "@/components/ExcluirButton";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +21,13 @@ const statusClass: Record<string, string> = {
 };
 
 export default async function ImoveisPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let imoveis: Awaited<ReturnType<typeof prisma.imovel.findMany>> = [];
   let erroConexao = false;
   try {
-    imoveis = await prisma.imovel.findMany({ orderBy: { createdAt: "desc" } });
+    imoveis = await prisma.imovel.findMany({ where: { usuarioId }, orderBy: { createdAt: "desc" } });
   } catch {
     erroConexao = true;
   }

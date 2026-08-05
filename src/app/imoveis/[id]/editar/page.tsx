@@ -1,11 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { requireUsuarioId } from "@/lib/tenant";
 import ImovelForm from "@/components/ImovelForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditarImovelPage({ params }: { params: { id: string } }) {
-  const imovel = await prisma.imovel.findUnique({ where: { id: params.id } });
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
+  const imovel = await prisma.imovel.findFirst({ where: { id: params.id, usuarioId } });
   if (!imovel) notFound();
 
   return (

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 type Params = { params: { id: string } };
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const documento = await prisma.documento.findUnique({ where: { id: params.id } });
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const documento = await prisma.documento.findFirst({ where: { id: params.id, usuarioId } });
   if (!documento) return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 });
 
   try {

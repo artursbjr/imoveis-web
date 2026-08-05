@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import ExcluirDocumentoButton from "@/components/ExcluirDocumentoButton";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +22,14 @@ type DocumentoComRelacoes = Prisma.DocumentoGetPayload<{
 }>;
 
 export default async function DocumentosPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let documentos: DocumentoComRelacoes[] = [];
   let erroConexao = false;
   try {
     documentos = await prisma.documento.findMany({
+      where: { usuarioId },
       include: { imovel: true, contrato: { include: { inquilino: true } } },
       orderBy: { createdAt: "desc" },
     });

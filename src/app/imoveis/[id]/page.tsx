@@ -1,13 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { requireUsuarioId } from "@/lib/tenant";
 import ExcluirButton from "@/components/ExcluirButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function DetalheImovelPage({ params }: { params: { id: string } }) {
-  const imovel = await prisma.imovel.findUnique({
-    where: { id: params.id },
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
+  const imovel = await prisma.imovel.findFirst({
+    where: { id: params.id, usuarioId },
     include: { contratos: { include: { inquilino: true } }, contasConsumo: true, documentos: true },
   });
 

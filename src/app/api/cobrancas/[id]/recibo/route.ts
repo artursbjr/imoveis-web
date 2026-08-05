@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 type Params = { params: { id: string } };
 
@@ -28,8 +29,11 @@ function formatMonth(d: Date) {
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const cobranca = await prisma.cobranca.findUnique({
-    where: { id: params.id },
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const cobranca = await prisma.cobranca.findFirst({
+    where: { id: params.id, usuarioId },
     include: {
       contrato: { include: { imovel: true, inquilino: true } },
       contasConsumo: { orderBy: { tipo: "asc" } },

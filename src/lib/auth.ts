@@ -9,9 +9,9 @@ import { prisma } from "./prisma";
  * Estratégia: login por e-mail/senha (Credentials Provider) com sessão JWT
  * (não usamos adapter de banco para sessões — o token fica no cookie do navegador).
  *
- * O único usuário permitido é o "administrador" criado via /registrar (ver
- * src/app/api/auth/registrar/route.ts). Não há cadastro público de múltiplos
- * usuários — este é um sistema de uso pessoal/único-administrador.
+ * Cada Usuario é um tenant independente (proprietário com sua própria carteira
+ * de imóveis) — cadastro aberto via /registrar (ver
+ * src/app/api/auth/registrar/route.ts).
  */
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -29,7 +29,7 @@ export const authOptions: NextAuthOptions = {
         const usuario = await prisma.usuario.findUnique({
           where: { email: credentials.email },
         });
-        if (!usuario || usuario.senhaHash === "not-set") return null;
+        if (!usuario) return null;
 
         const valido = await bcrypt.compare(credentials.senha, usuario.senhaHash);
         if (!valido) return null;

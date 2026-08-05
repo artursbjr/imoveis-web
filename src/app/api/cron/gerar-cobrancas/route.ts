@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
     // Contas de consumo do imóvel referentes a este mês, ainda não vinculadas a nenhuma cobrança
     const contasDoMes = await prisma.contaConsumo.findMany({
       where: {
+        usuarioId: contrato.usuarioId,
         imovelId: contrato.imovelId,
         cobrancaId: null,
         referenciaMes: { gte: referenciaMes, lt: inicioProximoMes },
@@ -57,6 +58,7 @@ export async function GET(req: NextRequest) {
     try {
       const cobranca = await prisma.cobranca.create({
         data: {
+          usuarioId: contrato.usuarioId,
           contratoId: contrato.id,
           referenciaMes,
           dataVencimento,

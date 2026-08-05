@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import MarcarCobrancaPagaButton from "@/components/MarcarCobrancaPagaButton";
 import ExcluirButton from "@/components/ExcluirButton";
 
@@ -23,10 +25,14 @@ const statusClass: Record<string, string> = {
 };
 
 export default async function CobrancasPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let cobrancas: CobrancaComRelacoes[] = [];
   let erroConexao = false;
   try {
     cobrancas = await prisma.cobranca.findMany({
+      where: { usuarioId },
       include: { contrato: { include: { imovel: true, inquilino: true } } },
       orderBy: { referenciaMes: "desc" },
     });

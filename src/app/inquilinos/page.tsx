@@ -1,14 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 import ExcluirButton from "@/components/ExcluirButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function InquilinosPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let inquilinos: Awaited<ReturnType<typeof prisma.inquilino.findMany>> = [];
   let erroConexao = false;
   try {
-    inquilinos = await prisma.inquilino.findMany({ orderBy: { nome: "asc" } });
+    inquilinos = await prisma.inquilino.findMany({ where: { usuarioId }, orderBy: { nome: "asc" } });
   } catch {
     erroConexao = true;
   }

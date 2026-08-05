@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 const imovelSchema = z.object({
   apelido: z.string().min(1),
@@ -23,9 +22,12 @@ const imovelSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
   const status = req.nextUrl.searchParams.get("status");
   const imoveis = await prisma.imovel.findMany({
-    where: status ? { status: status as any } : undefined,
+    where: { usuarioId, status: status ? (status as any) : undefined },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(imoveis);
@@ -33,11 +35,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-    }
-    const usuarioId = (session.user as any).id as string;
+    const usuarioId = await requireUsuarioId();
+    if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
     const body = await req.json();
     const data = imovelSchema.parse(body);

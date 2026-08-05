@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { requireUsuarioId } from "@/lib/tenant";
 import ContratoEditForm from "@/components/ContratoEditForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditarContratoPage({ params }: { params: { id: string } }) {
-  const contrato = await prisma.contrato.findUnique({
-    where: { id: params.id },
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
+  const contrato = await prisma.contrato.findFirst({
+    where: { id: params.id, usuarioId },
     include: { imovel: true, inquilino: true },
   });
   if (!contrato) notFound();

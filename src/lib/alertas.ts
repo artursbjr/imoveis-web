@@ -2,7 +2,7 @@ import { prisma } from "./prisma";
 
 const DIAS_ANTECEDENCIA = 7;
 
-export async function getAlertas() {
+export async function getAlertas(usuarioId: string) {
   const agora = new Date();
   const limite = new Date();
   limite.setDate(limite.getDate() + DIAS_ANTECEDENCIA);
@@ -10,6 +10,7 @@ export async function getAlertas() {
   const [contasPendentes, cobrancasPendentes] = await Promise.all([
     prisma.contaConsumo.findMany({
       where: {
+        usuarioId,
         status: { in: ["PENDENTE", "ATRASADO"] },
         dataVencimento: { lte: limite },
       },
@@ -18,6 +19,7 @@ export async function getAlertas() {
     }),
     prisma.cobranca.findMany({
       where: {
+        usuarioId,
         status: { in: ["PENDENTE", "ATRASADO"] },
         dataVencimento: { lte: limite },
       },

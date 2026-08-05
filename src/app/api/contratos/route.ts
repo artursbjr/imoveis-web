@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 const contratoSchema = z.object({
   imovelId: z.string().uuid(),
@@ -16,7 +17,11 @@ const contratoSchema = z.object({
 });
 
 export async function GET() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
   const contratos = await prisma.contrato.findMany({
+    where: { usuarioId },
     include: { imovel: true, inquilino: true },
     orderBy: { createdAt: "desc" },
   });
@@ -25,9 +30,20 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const usuarioId = await requireUsuarioId();
+    if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
     const body = await req.json();
     const data = contratoSchema.parse(body);
-    const contrato = await prisma.contrato.create({ data });
+
+    const [imovel, inquilino] = await Promise.all([
+      prisma.imovel.findFirst({ where: { id: data.imovelId, usuarioId } }),
+      prisma.inquilino.findFirst({ where: { id: data.inquilinoId, usuarioId } }),
+    ]);
+    if (!imovel) return NextResponse.json({ error: "Imóvel não encontrado" }, { status: 404 });
+    if (!inquilino) return NextResponse.json({ error: "Inquilino não encontrado" }, { status: 404 });
+
+    const contrato = await prisma.contrato.create({ data: { ...data, usuarioId } });
 
     // Ao criar o contrato, marca o imóvel como alugado
     await prisma.imovel.update({

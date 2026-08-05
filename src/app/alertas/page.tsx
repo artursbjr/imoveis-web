@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getAlertas } from "@/lib/alertas";
+import { requireUsuarioId } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +10,15 @@ function formatDate(d: Date) {
 }
 
 export default async function AlertasPage() {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) redirect("/login");
+
   let aPagar: Awaited<ReturnType<typeof getAlertas>>["aPagar"] = [];
   let aReceber: Awaited<ReturnType<typeof getAlertas>>["aReceber"] = [];
   let erroConexao = false;
 
   try {
-    const result = await getAlertas();
+    const result = await getAlertas(usuarioId);
     aPagar = result.aPagar;
     aReceber = result.aReceber;
   } catch {

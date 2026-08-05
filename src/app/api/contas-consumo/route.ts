@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 const contaSchema = z.object({
   imovelId: z.string().uuid(),
@@ -12,11 +13,15 @@ const contaSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
   const imovelId = req.nextUrl.searchParams.get("imovelId");
   const status = req.nextUrl.searchParams.get("status");
   const semCobranca = req.nextUrl.searchParams.get("semCobranca") === "true";
   const contas = await prisma.contaConsumo.findMany({
     where: {
+      usuarioId,
       imovelId: imovelId || undefined,
       status: status ? (status as any) : undefined,
       cobrancaId: semCobranca ? null : undefined,
@@ -29,9 +34,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const usuarioId = await requireUsuarioId();
+    if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
     const body = await req.json();
     const data = contaSchema.parse(body);
-    const conta = await prisma.contaConsumo.create({ data });
+
+    const imovel = await prisma.imovel.findFirst({ where: { id: data.imovelId, usuarioId } });
+    if (!imovel) return NextResponse.json({ error: "Imóvel não encontrado" }, { status: 404 });
+
+    const conta = await prisma.contaConsumo.create({ data: { ...data, usuarioId } });
     return NextResponse.json(conta, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {

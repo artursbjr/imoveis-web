@@ -1,6 +1,6 @@
 # Gestão de Imóveis
 
-Sistema web para administração de imóveis para aluguel: cadastro de imóveis, inquilinos e contratos, geração de cobranças mensais de aluguel (com recibo em PDF), controle de contas de consumo (luz, água, gás, condomínio, internet, seguro), centralização de documentos e alertas de vencimento.
+Sistema web multi-tenant para administração de imóveis para aluguel: cada proprietário se cadastra e gerencia sua própria carteira, isolada das demais — cadastro de imóveis, inquilinos e contratos, geração de cobranças mensais de aluguel (com recibo em PDF), controle de contas de consumo (luz, água, gás, condomínio, internet, seguro), centralização de documentos e alertas de vencimento.
 
 Construído com **Next.js 14 (App Router)**, **Prisma + PostgreSQL**, **NextAuth** e hospedado na **Vercel**.
 
@@ -48,7 +48,7 @@ vercel.json               → configuração do cron job
 
 ## Modelo de dados (resumo)
 
-- **Usuario** — administrador do sistema (login único, ver seção Autenticação)
+- **Usuario** — um tenant: proprietário cadastrado no sistema, dono de sua própria carteira de imóveis (ver seção Autenticação)
 - **Imovel** — propriedade cadastrada, com endereço, tipo e status (vago/alugado/próprio/manutenção)
 - **Inquilino** — pessoa física/jurídica que aluga um imóvel
 - **Contrato** — vincula um Imóvel a um Inquilino, com valores e vencimento
@@ -56,16 +56,18 @@ vercel.json               → configuração do cron job
 - **ContaConsumo** — conta de consumo (luz, água, gás, condomínio, internet, seguro, IPTU) de um imóvel; pode ser vinculada a uma Cobranca
 - **Documento** — arquivo (PDF/imagem) vinculado a um Imóvel ou Contrato, armazenado no Vercel Blob
 
+Todo modelo (exceto Usuario) tem uma coluna `usuarioId` que identifica o tenant dono do registro — toda rota de API e toda página server-side filtra por ela (ver `src/lib/tenant.ts`), garantindo isolamento entre carteiras de proprietários diferentes.
+
 Todas as exclusões em cascata relevantes estão configuradas no schema (ex: excluir um imóvel remove seus contratos, contas e documentos).
 
 ## Autenticação
 
-O sistema foi desenhado para **um único administrador** (uso pessoal):
+Sistema multi-tenant: cada proprietário tem sua própria conta e enxerga apenas seus próprios dados.
 
-1. Na primeira execução, acesse `/registrar` para criar a conta (nome, e-mail, senha).
-2. Esse endpoint (`/api/auth/registrar`) só funciona **uma vez** — depois que existe um usuário com senha definida, novas tentativas de registro são bloqueadas.
-3. Login normal em `/login` a partir daí.
-4. O middleware (`src/middleware.ts`) bloqueia acesso a qualquer página ou rota de API sem sessão válida.
+1. Acesse `/registrar` para criar uma conta (nome, e-mail, senha) — cadastro aberto, sem limite de usuários.
+2. Login em `/login`.
+3. O middleware (`src/middleware.ts`) bloqueia acesso a qualquer página ou rota de API sem sessão válida.
+4. Toda leitura/escrita no banco é filtrada pelo `usuarioId` da sessão atual (helper `requireUsuarioId()` em `src/lib/tenant.ts`), isolando os dados de cada proprietário.
 
 ## Cobranças e integração com contas de consumo
 
@@ -77,12 +79,12 @@ O job de cron (`/api/cron/gerar-cobrancas`, agendado em `vercel.json` para rodar
 
 ```bash
 npm install
-cp .env.example .env   # preencha DATABASE_URL, NEXTAUTH_SECRET, BLOB_READ_WRITE_TOKEN, CRON_SECRET
-npx prisma db push     # sincroniza o schema com o banco
+cp .env.example .env      # preencha DATABASE_URL, NEXTAUTH_SECRET, BLOB_READ_WRITE_TOKEN, CRON_SECRET
+npx prisma migrate dev    # aplica as migrations no banco
 npm run dev
 ```
 
-Acesse `http://localhost:3000/registrar` para criar a conta de administrador.
+Acesse `http://localhost:3000/registrar` para criar sua conta.
 
 ## Variáveis de ambiente
 
@@ -95,6 +97,6 @@ Acesse `http://localhost:3000/registrar` para criar a conta de administrador.
 
 ## Deploy
 
-O projeto é hospedado na Vercel. O build (`npm run build`) roda `prisma db push` automaticamente antes de compilar o Next.js, então qualquer alteração no `schema.prisma` é aplicada ao banco a cada deploy.
+O projeto é hospedado na Vercel. O build (`npm run build`) roda `prisma migrate deploy` automaticamente antes de compilar o Next.js, aplicando as migrations versionadas em `prisma/migrations/` ao banco a cada deploy.
 
 O cron job configurado em `vercel.json` chama `/api/cron/gerar-cobrancas` diariamente às 6h UTC (3h no horário de Brasília).

@@ -90,7 +90,13 @@ model Usuario {
   senhaHash String
   createdAt DateTime @default(now())
 
-  imoveis Imovel[]
+  imoveis       Imovel[]
+  inquilinos    Inquilino[]
+  contratos     Contrato[]
+  cobrancas     Cobranca[]
+  contasConsumo ContaConsumo[]
+  documentos    Documento[]
+  alertas       Alerta[]
 }
 
 model Imovel {
@@ -128,8 +134,11 @@ model Imovel {
 
 model Inquilino {
   id          String   @id @default(uuid())
+  usuarioId   String
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+
   nome        String
-  cpfCnpj     String   @unique
+  cpfCnpj     String
   email       String?
   telefone    String?
   endereco    String?
@@ -137,10 +146,15 @@ model Inquilino {
   createdAt   DateTime @default(now())
 
   contratos   Contrato[]
+
+  @@unique([usuarioId, cpfCnpj])
+  @@index([usuarioId])
 }
 
 model Contrato {
   id               String          @id @default(uuid())
+  usuarioId        String
+  usuario          Usuario         @relation(fields: [usuarioId], references: [id])
   imovelId         String
   imovel           Imovel          @relation(fields: [imovelId], references: [id], onDelete: Cascade)
   inquilinoId      String
@@ -165,6 +179,7 @@ model Contrato {
   cobrancas        Cobranca[]
   documentos       Documento[]
 
+  @@index([usuarioId])
   @@index([imovelId])
   @@index([inquilinoId])
 }
@@ -172,6 +187,8 @@ model Contrato {
 // Cobrança de aluguel (gerada mensalmente por contrato)
 model Cobranca {
   id              String         @id @default(uuid())
+  usuarioId       String
+  usuario         Usuario        @relation(fields: [usuarioId], references: [id])
   contratoId      String
   contrato        Contrato       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
 
@@ -196,11 +213,14 @@ model Cobranca {
   contasConsumo   ContaConsumo[]
 
   @@unique([contratoId, referenciaMes])
+  @@index([usuarioId])
   @@index([status, dataVencimento])
 }
 
 model ContaConsumo {
   id             String           @id @default(uuid())
+  usuarioId      String
+  usuario        Usuario          @relation(fields: [usuarioId], references: [id])
   imovelId       String
   imovel         Imovel           @relation(fields: [imovelId], references: [id], onDelete: Cascade)
 
@@ -219,6 +239,7 @@ model ContaConsumo {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
+  @@index([usuarioId])
   @@index([imovelId, tipo])
   @@index([status, dataVencimento])
   @@index([cobrancaId])
@@ -226,6 +247,8 @@ model ContaConsumo {
 
 model Documento {
   id          String        @id @default(uuid())
+  usuarioId   String
+  usuario     Usuario       @relation(fields: [usuarioId], references: [id])
   imovelId    String?
   imovel      Imovel?       @relation(fields: [imovelId], references: [id], onDelete: Cascade)
   contratoId  String?
@@ -238,6 +261,7 @@ model Documento {
 
   createdAt   DateTime      @default(now())
 
+  @@index([usuarioId])
   @@index([imovelId])
   @@index([contratoId])
 }
@@ -245,6 +269,8 @@ model Documento {
 // Registro de alertas (gerado por job/cron a partir de Cobranca e ContaConsumo)
 model Alerta {
   id             String       @id @default(uuid())
+  usuarioId      String
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
   tipo           TipoAlerta   // A_PAGAR (contas) ou A_RECEBER (aluguel)
   status         StatusAlerta @default(PENDENTE)
 
@@ -256,5 +282,6 @@ model Alerta {
   dataVencimento DateTime
   createdAt      DateTime     @default(now())
 
+  @@index([usuarioId])
   @@index([status, dataVencimento])
 }

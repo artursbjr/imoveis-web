@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 const imovelUpdateSchema = z.object({
   apelido: z.string().min(1).optional(),
@@ -23,8 +24,11 @@ const imovelUpdateSchema = z.object({
 type Params = { params: { id: string } };
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const imovel = await prisma.imovel.findUnique({
-    where: { id: params.id },
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const imovel = await prisma.imovel.findFirst({
+    where: { id: params.id, usuarioId },
     include: {
       contratos: { include: { inquilino: true } },
       contasConsumo: { orderBy: { dataVencimento: "desc" }, take: 12 },
@@ -37,6 +41,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    const usuarioId = await requireUsuarioId();
+    if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+    const existente = await prisma.imovel.findFirst({ where: { id: params.id, usuarioId } });
+    if (!existente) return NextResponse.json({ error: "Imóvel não encontrado" }, { status: 404 });
+
     const body = await req.json();
     const data = imovelUpdateSchema.parse(body);
     const imovel = await prisma.imovel.update({ where: { id: params.id }, data });
@@ -51,6 +61,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const existente = await prisma.imovel.findFirst({ where: { id: params.id, usuarioId } });
+  if (!existente) return NextResponse.json({ error: "Imóvel não encontrado" }, { status: 404 });
+
   await prisma.imovel.delete({ where: { id: params.id } });
   return new NextResponse(null, { status: 204 });
 }

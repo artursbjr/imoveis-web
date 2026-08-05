@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 const cobrancaUpdateSchema = z.object({
   status: z.enum(["PENDENTE", "PAGO", "ATRASADO", "CANCELADO"]).optional(),
@@ -12,8 +13,11 @@ const cobrancaUpdateSchema = z.object({
 type Params = { params: { id: string } };
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const cobranca = await prisma.cobranca.findUnique({
-    where: { id: params.id },
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const cobranca = await prisma.cobranca.findFirst({
+    where: { id: params.id, usuarioId },
     include: { contrato: { include: { imovel: true, inquilino: true } } },
   });
   if (!cobranca) return NextResponse.json({ error: "Cobrança não encontrada" }, { status: 404 });
@@ -22,6 +26,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    const usuarioId = await requireUsuarioId();
+    if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+    const existente = await prisma.cobranca.findFirst({ where: { id: params.id, usuarioId } });
+    if (!existente) return NextResponse.json({ error: "Cobrança não encontrada" }, { status: 404 });
+
     const body = await req.json();
     const data = cobrancaUpdateSchema.parse(body);
     const cobranca = await prisma.cobranca.update({ where: { id: params.id }, data });
@@ -36,6 +46,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const existente = await prisma.cobranca.findFirst({ where: { id: params.id, usuarioId } });
+  if (!existente) return NextResponse.json({ error: "Cobrança não encontrada" }, { status: 404 });
+
   await prisma.cobranca.delete({ where: { id: params.id } });
   return new NextResponse(null, { status: 204 });
 }

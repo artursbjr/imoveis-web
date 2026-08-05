@@ -1,19 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+// Sistema multi-tenant: cada Usuario se cadastra via /registrar.
+// Não há mais um usuário placeholder a semear — este script fica vazio de propósito,
+// mantido apenas para o caso de precisarmos de dados de exemplo no futuro.
+async function main() {}
 
-const prisma = new PrismaClient();
-
-async function main() {
-  await prisma.usuario.upsert({
-    where: { email: "owner@local" },
-    update: {},
-    create: { nome: "Proprietário", email: "owner@local", senhaHash: "not-set" },
-  });
-}
-
-main()
-  .then(() => prisma.$disconnect())
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

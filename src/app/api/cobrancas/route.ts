@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUsuarioId } from "@/lib/tenant";
 
 const cobrancaSchema = z.object({
   contratoId: z.string().uuid(),
@@ -15,9 +16,12 @@ const cobrancaSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const usuarioId = await requireUsuarioId();
+  if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
   const contratoId = req.nextUrl.searchParams.get("contratoId");
   const cobrancas = await prisma.cobranca.findMany({
-    where: { contratoId: contratoId || undefined },
+    where: { usuarioId, contratoId: contratoId || undefined },
     include: { contrato: { include: { imovel: true, inquilino: true } } },
     orderBy: { referenciaMes: "desc" },
   });
@@ -26,21 +30,25 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const usuarioId = await requireUsuarioId();
+    if (!usuarioId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
     const body = await req.json();
     const data = cobrancaSchema.parse(body);
 
-    const contrato = await prisma.contrato.findUnique({ where: { id: data.contratoId } });
+    const contrato = await prisma.contrato.findFirst({ where: { id: data.contratoId, usuarioId } });
     if (!contrato) {
       return NextResponse.json({ error: "Contrato não encontrado" }, { status: 404 });
     }
 
     // Busca as contas de consumo selecionadas, garantindo que pertencem ao imóvel
-    // do contrato e ainda não estão vinculadas a nenhuma outra cobrança.
+    // do contrato, ao mesmo tenant, e ainda não estão vinculadas a nenhuma outra cobrança.
     let contasSelecionadas: { id: string; valor: number }[] = [];
     if (data.contasConsumoIds && data.contasConsumoIds.length > 0) {
       contasSelecionadas = await prisma.contaConsumo.findMany({
         where: {
           id: { in: data.contasConsumoIds },
+          usuarioId,
           imovelId: contrato.imovelId,
           cobrancaId: null,
         },
@@ -62,6 +70,7 @@ export async function POST(req: NextRequest) {
     const cobranca = await prisma.cobranca.create({
       data: {
         ...cobrancaData,
+        usuarioId,
         valorContas: valorContas || undefined,
         valorTotal,
       },
