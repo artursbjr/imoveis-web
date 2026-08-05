@@ -90,13 +90,15 @@ Acesse `http://localhost:3000/registrar` para criar sua conta.
 
 | Variável | Descrição |
 |---|---|
-| `DATABASE_URL` | String de conexão do PostgreSQL (Neon) |
+| `DATABASE_URL` | String de conexão do PostgreSQL — em produção (Supabase), a conexão em **pooling** (porta 6543, `?pgbouncer=true`), usada em runtime pelas serverless functions |
+| `DIRECT_URL` | Conexão **direta** ao Postgres (porta 5432) — usada só pelo `prisma migrate deploy` no build, que precisa de uma conexão sem pooler |
 | `NEXTAUTH_SECRET` | Segredo usado para assinar as sessões (gerar com `openssl rand -base64 32`) |
+| `NEXTAUTH_URL` | URL pública do deploy (ex: `https://seu-projeto.vercel.app`) |
 | `BLOB_READ_WRITE_TOKEN` | Token do Vercel Blob (criado automaticamente ao conectar o Storage no projeto Vercel) |
 | `CRON_SECRET` | Segredo que autentica as chamadas do Vercel Cron ao job de geração de cobranças |
 
 ## Deploy
 
-O projeto é hospedado na Vercel. O build (`npm run build`) roda `prisma migrate deploy` automaticamente antes de compilar o Next.js, aplicando as migrations versionadas em `prisma/migrations/` ao banco a cada deploy.
+O projeto é hospedado na Vercel, com banco PostgreSQL no Supabase. O build (`npm run build`) roda `prisma migrate deploy` automaticamente antes de compilar o Next.js, aplicando as migrations versionadas em `prisma/migrations/` ao banco a cada deploy — por isso `DIRECT_URL` precisa apontar para a conexão direta (não a pooled) do Supabase.
 
 O cron job configurado em `vercel.json` chama `/api/cron/gerar-cobrancas` diariamente às 6h UTC (3h no horário de Brasília).
